@@ -2,64 +2,140 @@
 import {describe, it} from 'mocha';
 import {expect} from 'chai';
 import Sanidator from '../lib';
+import {mapPromiseObject} from '../lib/util';
+
 
 
 describe('Sanidator', () => {
-  it('basic', () => {
+  const emails = [];
+  const usernames = [];
 
-    const checkEmail = async (value, {key, data, validators, error, warn}) => {
+  Sanidator.addValidator(
+    'isEmail',
+    (x) => x && x.indexOf('@') >= 0
+  );
+
+  Sanidator.addValidator(
+    'checkEmailDomain',
+    (x) => Promise.resolve(/@(gmail.com|yahoo.com)$/i.test(x))
+  );
+
+  Sanidator.addValidator(
+    'isEmailAvailable',
+    (x) => Promise.resolve(emails.indexOf(x) === -1)
+  );
+
+  Sanidator.addValidator(
+    'isUsername',
+    (x) => /^\w+$/.test(x)
+  );
+
+  Sanidator.addValidator(
+    'isBadUsername',
+    (x) => /admin/i.test(x)
+  );
+
+  Sanidator.addValidator(
+    'isUsernameAvailable',
+    (x) => Promise.resolve(usernames.indexOf(x) === -1)
+  );
+
+  Sanidator.addValidator(
+    'isPassword',
+    (x) => /^\w+$/.test(x)
+  );
+
+  Sanidator.addValidator(
+    'isWeakPassword',
+    (x) => !x || x.length < 8
+  );
+
+  Sanidator.addValidator(
+    'trim',
+    (value) => value && value.trim() || null
+  );
+
+  Sanidator.addValidator(
+    'trimLength',
+    (max) => (value) =>
+      value && value.length > max ?
+      value.substring(0, max) :
+      value
+  );
+
+  it('basic', async (done) => {
+
+    const checkEmail = async (value, {validators, error, warn}) => {
       if (!validators.isEmail(value)) {
         return error('Invalid email');
       }
-      if (!await checkEmailDomain(value)) {
+      if (!await validators.checkEmailDomain(value)) {
         return warn('Invalid email domain');
       }
-      if (!await isAvailable(value)) {
+      if (!await validators.isEmailAvailable(value)) {
         return error('Email is taken');
       }
     };
 
-    const checkUsername = async (value, {key, data, validators, error, warn}) => {
+    const checkUsername = async (value, {validators, error, warn}) => {
       if (!validators.isUsername(value)) {
         return error('Invalid Username');
       }
       if (validators.isBadUsername(value)) {
         return warn('Bad Username');
       }
-      if (!await isAvailable(value)) {
+      if (!await validators.isUsernameAvailable(value)) {
         return error('Username is taken');
       }
     };
 
-    const checkPassword = async (value, {passwordConfirm}) => {
+    const checkPassword = async (value, {data, validators, error, warn}) => {
       if (!validators.isPassword(value)) {
         return error('Invalid Password');
       }
-      if (!validators.isWeak(value)) {
+      if (!validators.isWeakPassword(value)) {
         return warn('Weak Password');
       }
-      if (value !== passwordConfirm) {
+      if (value !== data.passwordConfirm) {
         return error('Wrong password confirm');
       }
     }
 
-    const trim = (value) => value && value.trim() || null;
-    const trimLength = (min, max) => (value) => value && value.trim() || null;
-
-    new Sanidator({
+    const sany = new Sanidator({
       name: 'Basic',
       rules: [
-        ({emailMaxLength}, {trim, length}) => ({
+        ({emailMaxLength}, {trim, trimLength}) => ({
           email: [trim, trimLength(emailMaxLength)],
           username: trim,
-          ...rest,
         }),
-        (config, {checkEmail, checkUsername}) => ({
-          email: [checkEmail],
-          username: [checkUsername],
-          ...rest,
-        }),
+        {
+          email: checkEmail,
+          username: checkUsername,
+          password: checkPassword,
+        },
       ],
+      config: {
+        emailMaxLength: 254,
+      },
     });
+
+    const res = sany.process({
+      a: 1,
+      email: 'aseouth',
+      username: 'hi',
+      password: 'pass',
+    });
+
+    mapPromiseObject(
+      res.data,
+      (data) => {
+        console.log(data);
+        done();
+      },
+      (err) => {
+        console.error(err);
+        done(err);
+      }
+    );
   });
 });

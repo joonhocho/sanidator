@@ -12,26 +12,27 @@ const values = (x) => Object.keys(x).map((key) => x[key]);
 const toArray = (x) =>
   Array.isArray(x) ? x : [x];
 
-const mapPromise = (x, fn, onRejected) => {
+const mapPromise = (x, onResolve, onReject) => {
   if (isPromise(x)) {
-    return x.then(fn, onRejected);
+    return x.then(onResolve, onReject);
   }
 
-  if (onRejected) {
+  if (onReject) {
     try {
-      return fn(x);
+      return onResolve(x);
     } catch (err) {
-      return onRejected(err);
+      return onReject(err);
     }
   }
 
-  return fn(x);
+  return onResolve(x);
 };
 
 
 const promiseProps = (obj) => {
   const promises = [];
-  const keyToIndex = Object.create(null);
+  const keyToIndex = {};
+
   forEach(obj, (v, k) => {
     if (isPromise(v)) {
       keyToIndex[k] = promises.length;
@@ -54,9 +55,20 @@ const promiseProps = (obj) => {
 };
 
 
-const mapPromiseObject = (obj, onResolved, onRejected) => {
-  return mapPromise(mapPromise(obj, promiseProps), onResolved, onRejected);
-};
+const mapPromiseObject = (obj, onResolved, onReject) =>
+  mapPromise(
+    mapPromise(obj, promiseProps),
+    onResolved, onReject
+  );
+
+
+const reducePromise = (fns, value) => fns.reduce(
+  (value, fn) => mapPromise(value, fn),
+  value
+);
+
+
+const promisify = (fn) => (x) => mapPromise(x, fn);
 
 
 export {
@@ -68,6 +80,8 @@ export {
   toArray,
   promiseProps,
   mapPromiseObject,
+  reducePromise,
+  promisify,
 };
 
 export default {
@@ -79,4 +93,6 @@ export default {
   toArray,
   promiseProps,
   mapPromiseObject,
+  reducePromise,
+  promisify,
 };
