@@ -1,43 +1,58 @@
-import {isPromise, map, toArray, mapPromise, mapPromiseObject, reducePromise} from './util';
+import {map, toArray, mapPromise, mapPromiseObject, toPromise} from './util';
 
 
 const sanidators = Object.create(null);
 const validators = Object.create(null);
 
 
-const ruleToFunction = (fnsMap) => (data, context) => ({
-  ...data,
-  ...map(fnsMap, (fns, key) => {
-    const contextForKey = {
-      validators,
-      ...context,
-      key,
-      data,
-    };
-    return reducePromise(
-      fns.map((fn) => (value) => {
-        if (context.errors.length) {
-          return value;
-        }
-        contextForKey.error = (message) => {
-          context.errors.push({key, value, message});
-        };
-        contextForKey.warn = (message) => {
-          context.warnings.push({key, value, message});
-        };
-        return mapPromise(
-          fn(value, contextForKey),
-          (v) => v === undefined ? value : v,
-          (e) => {
-            contextForKey.error(e.message);
-            return value;
-          }
-        );
-      }),
-      data[key]
-    )
-  }),
-});
+const errorFn = (errors, key, value) => (error) => {
+  errors.push({key, value, error});
+};
+
+const warnFn = (warnings, key, value) => (warning) => {
+  warnings.push({key, value, warning});
+};
+
+const valueIfUndefined = (value) => (v) => {
+  if (v === undefined) return value;
+  return v;
+};
+
+const logError = (value, error) => (e) => {
+  error(e);
+  return value;
+};
+
+
+const ruleToFunction = (fnsMap) => (data, {errors, warnings}) => Object.assign({}, data, map(fnsMap, (fns, key) => {
+  const contextForKey = {
+    key,
+    data,
+    errors,
+    warnings,
+    validators,
+  };
+
+  const nextFn = (fn) => (value) => {
+    if (errors.length) return value;
+
+    contextForKey.error = errorFn(errors, key, value);
+    contextForKey.warn = warnFn(errors, key, value);
+
+    return mapPromise(
+      fn(value, contextForKey),
+      valueIfUndefined(value),
+      logError(value, contextForKey.error)
+    );
+  };
+
+  let value = data[key];
+  for (let i = 0; i < fns.length && !errors.length; i++) {
+    value = mapPromise(value, nextFn(fns[i]));
+  }
+
+  return value;
+}));
 
 
 export default class Sanidator {
@@ -60,32 +75,43 @@ export default class Sanidator {
 
   setRules(rules, config) {
     this.rules = toArray(rules)
-      .map((rule) => typeof rule === 'function' ?
-        rule(config, validators) :
-        rule
-      )
-      .map((rule) => typeof rule === 'function' ?
-        rule :
-        ruleToFunction(map(rule, toArray))
-      );
+      .map((rule) => {
+        if (typeof rule === 'function') {
+          return rule(config, validators);
+        }
+        return rule;
+      })
+      .map((rule) => {
+        if (typeof rule === 'function') return rule;
+        return ruleToFunction(map(rule, toArray));
+      });
   }
 
-  process(data) {
+  process(obj) {
+    const {rules} = this;
+
     const errors = [];
     const warnings = [];
-    const context = {errors, warnings};
+    const ctxt = {errors, warnings};
 
-    const {rules} = this;
+    const nextRuleFn = (rule) => (data) => {
+      if (errors.length) return data;
+      return rule(data, ctxt);
+    };
+
     for (let i = 0; i < rules.length && !errors.length; i++) {
       // TODO await for errors from prev iteration
-      data = mapPromiseObject(data, (data) =>
-        rules[i](data, context))
+      obj = mapPromiseObject(obj, nextRuleFn(rules[i]));
     }
 
-    return mapPromiseObject(data, (data) => ({
+    return mapPromiseObject(obj, (data) => ({
       data,
       errors,
       warnings,
     }));
+  }
+
+  processAsync(obj) {
+    return toPromise(this.process(obj));
   }
 }

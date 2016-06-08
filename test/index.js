@@ -5,7 +5,6 @@ import Sanidator from '../lib';
 import {mapPromise} from '../lib/util';
 
 
-
 describe('Sanidator', () => {
   const emails = [];
   const usernames = [];
@@ -64,7 +63,6 @@ describe('Sanidator', () => {
   );
 
   it('basic', async (done) => {
-
     const checkEmail = async (value, {validators, error, warn}) => {
       if (!validators.isEmail(value)) {
         return error('Invalid email');
@@ -99,7 +97,7 @@ describe('Sanidator', () => {
       if (await Promise.resolve(value !== data.passwordConfirm)) {
         return error('Wrong password confirm');
       }
-    }
+    };
 
     const sany = new Sanidator({
       name: 'Basic',
@@ -119,24 +117,16 @@ describe('Sanidator', () => {
       },
     });
 
-    const res = sany.process({
+    const res = await sany.processAsync({
       a: 1,
       email: '  aseouth@theu  ',
       username: ' hi ',
       password: 'passsantu231',
       passwordConfirm: 'asssantu231',
+      c: 3,
     });
 
-    mapPromise(
-      res,
-      ({data, errors, warnings}) => {
-        console.log(data, errors, warnings);
-        done();
-      },
-      (err) => {
-        console.error(err, res.errors, res.warnings);
-        done(err);
-      }
-    );
+    console.log(res);
+    done();
   });
 });

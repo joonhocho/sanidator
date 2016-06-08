@@ -9,8 +9,10 @@ const map = (x, fn) => Object.keys(x).reduce((y, key) => {
 
 const values = (x) => Object.keys(x).map((key) => x[key]);
 
-const toArray = (x) =>
-  Array.isArray(x) ? x : [x];
+const toArray = (x) => {
+  if (Array.isArray(x)) return x;
+  return [x];
+};
 
 const mapPromise = (x, onResolve, onReject) => {
   if (isPromise(x)) {
@@ -41,14 +43,14 @@ const promiseProps = (obj) => {
   });
 
   if (promises.length) {
-    return Promise.all(promises).then((values) => {
-      return map(obj, (v, k) => {
+    return Promise.all(promises).then((vals) =>
+      map(obj, (v, k) => {
         if (k in keyToIndex) {
-          return values[keyToIndex[k]];
+          return vals[keyToIndex[k]];
         }
         return v;
-      });
-    });
+      })
+    );
   }
 
   return obj;
@@ -63,9 +65,15 @@ const mapPromiseObject = (obj, onResolved, onReject) =>
 
 
 const reducePromise = (fns, value) => fns.reduce(
-  (value, fn) => mapPromise(value, fn),
+  (v, fn) => mapPromise(v, fn),
   value
 );
+
+
+const toPromise = (x) => {
+  if (isPromise(x)) return x;
+  return Promise.resolve(x);
+};
 
 
 export {
@@ -78,6 +86,7 @@ export {
   promiseProps,
   mapPromiseObject,
   reducePromise,
+  toPromise,
 };
 
 export default {
@@ -90,4 +99,5 @@ export default {
   promiseProps,
   mapPromiseObject,
   reducePromise,
+  toPromise,
 };
