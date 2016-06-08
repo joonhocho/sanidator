@@ -13,13 +13,27 @@ const ruleToFunction = (fnsMap) => (data, context) => ({
       ...context,
       key,
       data,
-      error: (msg) => context.errors.push({key, msg}),
-      warn: (msg) => context.warnings.push({key, msg}),
     };
     return reducePromise(
-      fns.map((fn) =>
-        (value) => fn(value, contextForKey)
-      ),
+      fns.map((fn) => (value) => {
+        if (context.errors.length) {
+          return value;
+        }
+        contextForKey.error = (message) => {
+          context.errors.push({key, value, message});
+        };
+        contextForKey.warn = (message) => {
+          context.warnings.push({key, value, message});
+        };
+        return mapPromise(
+          fn(value, contextForKey),
+          (v) => v === undefined ? value : v,
+          (e) => {
+            contextForKey.error(e.message);
+            return value;
+          }
+        );
+      }),
       data[key]
     )
   }),
@@ -64,16 +78,14 @@ export default class Sanidator {
     const {rules} = this;
     for (let i = 0; i < rules.length && !errors.length; i++) {
       // TODO await for errors from prev iteration
-      data = mapPromiseObject(
-        data,
-        (data) => rules[i](data, context)
-      )
+      data = mapPromiseObject(data, (data) =>
+        rules[i](data, context))
     }
 
-    return {
+    return mapPromiseObject(data, (data) => ({
       data,
       errors,
       warnings,
-    };
+    }));
   }
 }

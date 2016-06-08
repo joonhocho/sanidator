@@ -2,7 +2,7 @@
 import {describe, it} from 'mocha';
 import {expect} from 'chai';
 import Sanidator from '../lib';
-import {mapPromiseObject} from '../lib/util';
+import {mapPromise} from '../lib/util';
 
 
 
@@ -93,10 +93,10 @@ describe('Sanidator', () => {
       if (!validators.isPassword(value)) {
         return error('Invalid Password');
       }
-      if (!validators.isWeakPassword(value)) {
+      if (validators.isWeakPassword(value)) {
         return warn('Weak Password');
       }
-      if (value !== data.passwordConfirm) {
+      if (await Promise.resolve(value !== data.passwordConfirm)) {
         return error('Wrong password confirm');
       }
     }
@@ -121,19 +121,20 @@ describe('Sanidator', () => {
 
     const res = sany.process({
       a: 1,
-      email: 'aseouth',
-      username: 'hi',
-      password: 'pass',
+      email: '  aseouth@theu  ',
+      username: ' hi ',
+      password: 'passsantu231',
+      passwordConfirm: 'asssantu231',
     });
 
-    mapPromiseObject(
-      res.data,
-      (data) => {
-        console.log(data);
+    mapPromise(
+      res,
+      ({data, errors, warnings}) => {
+        console.log(data, errors, warnings);
         done();
       },
       (err) => {
-        console.error(err);
+        console.error(err, res.errors, res.warnings);
         done(err);
       }
     );

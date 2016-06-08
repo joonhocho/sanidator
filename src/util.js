@@ -68,9 +68,6 @@ const reducePromise = (fns, value) => fns.reduce(
 );
 
 
-const promisify = (fn) => (x) => mapPromise(x, fn);
-
-
 export {
   isPromise,
   mapPromise,
@@ -81,7 +78,6 @@ export {
   promiseProps,
   mapPromiseObject,
   reducePromise,
-  promisify,
 };
 
 export default {
@@ -94,5 +90,4 @@ export default {
   promiseProps,
   mapPromiseObject,
   reducePromise,
-  promisify,
 };
